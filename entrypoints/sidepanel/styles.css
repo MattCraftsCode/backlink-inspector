@@ -31,6 +31,7 @@ html, body, #root { min-width: 320px; min-height: 100%; margin: 0; }
 body { min-height: 100vh; background: var(--surface); font-size: 12px; }
 button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
+.domain-save-button { color: #fff; }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .panel-shell { position: relative; min-height: 100vh; overflow: hidden; background: var(--surface); }

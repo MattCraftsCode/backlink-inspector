@@ -166,6 +166,7 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
   const toastTimer = useRef<number | undefined>(undefined);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -209,6 +210,26 @@ export default function App() {
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, [showToast]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !menuRef.current?.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuOpen]);
 
   const ensureScanner = useCallback(async (tab: chrome.tabs.Tab) => {
     if (!tab.id) throw new Error('No active tab is available.');
@@ -297,10 +318,10 @@ export default function App() {
   };
 
   const openDomainManager = useCallback(() => {
-    setDomainDraft(domains.map((item) => item.domain).join('\n'));
+    setDomainDraft('');
     setDomainManagerError('');
     setDomainManagerOpen(true);
-  }, [domains]);
+  }, []);
 
   const closeDomainManager = useCallback(() => {
     setDomainManagerOpen(false);
@@ -318,15 +339,26 @@ export default function App() {
       return;
     }
 
-    const updated = await replaceDomains(parsed.domains);
+    const savedDomainNames = domains.map((item) => item.domain);
+    const savedDomainSet = new Set(savedDomainNames.map((item) => item.toLowerCase()));
+    const additions = parsed.domains.filter((item) => !savedDomainSet.has(item.toLowerCase()));
+    if (!additions.length) {
+      setDomainManagerOpen(false);
+      setDomainDraft('');
+      showToast('Domains already saved');
+      return;
+    }
+
+    const updated = await replaceDomains([...savedDomainNames, ...additions]);
     const selected = updated.find((item) => item.id === selectedDomainId) ?? updated[0];
     setDomains(updated);
     setSelectedDomainId(selected?.id ?? '');
     setDomain(selected?.domain ?? '');
     setDomainManagerOpen(false);
+    setDomainDraft('');
     setDomainManagerError('');
-    showToast(`${updated.length} domains saved locally`);
-  }, [domainDraft, selectedDomainId, showToast]);
+    showToast(`${additions.length} ${additions.length === 1 ? 'domain' : 'domains'} added`);
+  }, [domainDraft, domains, selectedDomainId, showToast]);
 
   const handleExport = (format: 'json' | 'csv') => {
     const stamp = new Date().toISOString().slice(0, 10);
@@ -389,12 +421,12 @@ export default function App() {
             </div>
           </div>
         </div>
-        <div className="menu-wrap">
-          <button className="icon-btn" type="button" aria-label="Panel menu" title="Panel menu" onClick={() => setMenuOpen((value) => !value)}>
+        <div className="menu-wrap" ref={menuRef}>
+          <button className="icon-btn" type="button" aria-label="Panel menu" aria-expanded={menuOpen} aria-haspopup="menu" title="Panel menu" onClick={() => setMenuOpen((value) => !value)}>
             <MoreHorizontal size={18} />
           </button>
           {menuOpen && (
-            <div className="panel-menu">
+            <div className="panel-menu" role="menu">
               <button type="button" onClick={() => handleExport('json')} disabled={!results.length}><FileJson size={15} /> Export JSON</button>
               <button type="button" onClick={() => handleExport('csv')} disabled={!results.length}><FileSpreadsheet size={15} /> Export CSV</button>
               <div className="menu-divider" />

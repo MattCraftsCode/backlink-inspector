@@ -55,7 +55,7 @@ export default function DomainManagerDialog({
             className="min-h-48 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 font-mono text-xs leading-5 text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)] focus:ring-3 focus:ring-[color-mix(in_srgb,var(--brand)_18%,transparent)]"
             value={value}
             spellCheck={false}
-            placeholder={'resizecraft.com\nfullmira.com\nexample.com'}
+            placeholder={'example.com\nabc.com'}
             onChange={(event) => onChange(event.target.value)}
           />
           {error && <p className="mt-2 rounded-md bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-2.5 py-2 text-[11px] leading-4 text-[var(--danger)]" role="alert">{error}</p>}
@@ -64,7 +64,7 @@ export default function DomainManagerDialog({
 
         <footer className="flex justify-end gap-2 border-t border-[var(--line)] px-4 py-3">
           <button className="h-8 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 text-[11px] font-semibold text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--text)]" type="button" onClick={onClose}>Cancel</button>
-          <button className="h-8 rounded-md bg-[var(--brand)] px-3.5 text-[11px] font-semibold text-white transition hover:bg-[var(--brand-strong)]" type="button" onClick={onSave}>Save domains</button>
+          <button className="domain-save-button h-8 rounded-md bg-[var(--brand)] px-3.5 text-[11px] font-semibold transition hover:bg-[var(--brand-strong)]" type="button" onClick={onSave}>Save domains</button>
         </footer>
       </section>
     </div>
