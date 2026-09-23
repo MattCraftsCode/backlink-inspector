@@ -1,49 +1,53 @@
-import type { Project, SavedRecord } from '../shared/types';
+import type { SavedRecord, TargetDomain } from '../shared/types';
 
-const PROJECTS_KEY = 'backlinkInspector.projects';
+const DOMAINS_KEY = 'backlinkInspector.domains';
+const LEGACY_PROJECTS_KEY = 'backlinkInspector.projects';
 const RECORDS_KEY = 'backlinkInspector.records';
 
-const DEFAULT_PROJECTS: Project[] = [
+const DEFAULT_DOMAINS: TargetDomain[] = [
   {
     id: 'resizecraft',
-    name: 'ResizeCraft',
     domain: 'resizecraft.com',
     createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
   },
   {
     id: 'fullmira',
-    name: 'Fullmira',
     domain: 'fullmira.com',
     createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
   },
   {
     id: 'gamebodycam-wiki',
-    name: 'GameBodycam Wiki',
     domain: 'gamebodycam.wiki',
     createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
   },
 ];
 
-export const getProjects = async () => {
-  const stored = await chrome.storage.local.get(PROJECTS_KEY);
-  const projects = stored[PROJECTS_KEY] as Project[] | undefined;
-  if (projects?.length) return projects;
-  await chrome.storage.local.set({ [PROJECTS_KEY]: DEFAULT_PROJECTS });
-  return DEFAULT_PROJECTS;
+export const getDomains = async () => {
+  const stored = await chrome.storage.local.get([DOMAINS_KEY, LEGACY_PROJECTS_KEY]);
+  const domains = stored[DOMAINS_KEY] as TargetDomain[] | undefined;
+  if (domains?.length) return domains;
+
+  const legacyProjects = stored[LEGACY_PROJECTS_KEY] as Array<{ id: string; domain: string; createdAt: string }> | undefined;
+  const migrated = legacyProjects?.length
+    ? legacyProjects.map(({ id, domain, createdAt }) => ({ id, domain, createdAt }))
+    : DEFAULT_DOMAINS;
+  await chrome.storage.local.set({ [DOMAINS_KEY]: migrated });
+  return migrated;
 };
 
-export const saveProject = async (project: Omit<Project, 'id' | 'createdAt'>) => {
-  const projects = await getProjects();
-  const existing = projects.find((item) => item.domain.toLowerCase() === project.domain.toLowerCase());
-  if (existing) return { project: existing, projects };
-  const next: Project = {
-    ...project,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-  };
-  const updated = [...projects, next];
-  await chrome.storage.local.set({ [PROJECTS_KEY]: updated });
-  return { project: next, projects: updated };
+export const replaceDomains = async (values: string[]) => {
+  const current = await getDomains();
+  const byDomain = new Map(current.map((item) => [item.domain.toLowerCase(), item]));
+  const updated: TargetDomain[] = values.map((domain) => {
+    const existing = byDomain.get(domain.toLowerCase());
+    return existing ?? {
+      id: crypto.randomUUID(),
+      domain,
+      createdAt: new Date().toISOString(),
+    };
+  });
+  await chrome.storage.local.set({ [DOMAINS_KEY]: updated });
+  return updated;
 };
 
 export const getSavedRecords = async () => {

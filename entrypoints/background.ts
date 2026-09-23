@@ -6,8 +6,36 @@ const pingContentScript = async (tabId: number) => {
   return response?.ok === true;
 };
 
+const injectContentScript = async (tabId: number) => {
+  try {
+    if (await pingContentScript(tabId)) return;
+  } catch {
+    // The scanner has not been injected into this page yet.
+  }
+
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['content-scripts/content.js'],
+  });
+
+  if (!(await pingContentScript(tabId))) {
+    throw new Error('The page scanner did not start.');
+  }
+};
+
 export default defineBackground(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
+  // Handle the toolbar click ourselves so activeTab is used while the user gesture is active.
+  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+
+  chrome.action.onClicked.addListener((tab) => {
+    if (!tab.id) return;
+
+    void chrome.sidePanel.open({ tabId: tab.id });
+
+    const pageAccess = classifyPageAccess(tab.url);
+    if (pageAccess.kind === 'restricted') return;
+    void injectContentScript(tab.id).catch(() => undefined);
+  });
 
   chrome.runtime.onMessage.addListener((message: BackgroundRequest, _sender, sendResponse) => {
     const handle = async (): Promise<BackgroundResponse> => {
@@ -24,19 +52,8 @@ export default defineBackground(() => {
         }
 
         try {
-          if (await pingContentScript(message.tabId)) return { ok: true };
-        } catch {
-          // Continue with a one-time programmatic injection.
-        }
-
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: message.tabId },
-            files: ['content-scripts/content.js'],
-          });
-          return (await pingContentScript(message.tabId))
-            ? { ok: true }
-            : { ok: false, code: 'INJECTION_FAILED', message: 'The page scanner did not start.' };
+          await injectContentScript(message.tabId);
+          return { ok: true };
         } catch (error) {
           const messageText = error instanceof Error ? error.message : String(error);
           const permissionError = /permission|Cannot access contents|host/i.test(messageText);
@@ -44,7 +61,7 @@ export default defineBackground(() => {
             ok: false,
             code: permissionError ? 'PERMISSION_REQUIRED' : 'INJECTION_FAILED',
             message: permissionError
-              ? 'This tab has not granted page access. Keep the page active, click the Backlink Inspector toolbar icon, and scan again.'
+              ? 'The scanner cannot access this tab. Use a normal HTTP or HTTPS page, reload the extension, and refresh the page.'
               : messageText,
           };
         }

@@ -28,5 +28,5 @@ pnpm test
 - 可见性、页面 `noindex` 与页面级 `nofollow` 检测
 - Overlay 高亮与结果定位，不改写原始文字节点
 - Open Shadow DOM 扫描和动态页面防抖重扫
-- 本地项目、收藏记录、JSON 与 CSV 导出
-- `activeTab` 与按站点申请的可选权限
+- 域名列表批量管理、收藏记录、JSON 与 CSV 导出
+- 普通 `http/https` 页面自动注入扫描脚本

@@ -55,14 +55,3 @@ export const classifyPageAccess = (value?: string): PageAccess => {
 
   return { kind: 'inspectable' };
 };
-
-export const getOptionalOriginPattern = (value?: string) => {
-  if (!value) return undefined;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined;
-    return `${url.origin}/*`;
-  } catch {
-    return undefined;
-  }
-};

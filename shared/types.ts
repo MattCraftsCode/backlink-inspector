@@ -57,9 +57,8 @@ export interface ScanPayload {
   dynamic?: boolean;
 }
 
-export interface Project {
+export interface TargetDomain {
   id: string;
-  name: string;
   domain: string;
   createdAt: string;
 }
@@ -68,7 +67,7 @@ export interface SavedRecord extends ScanResult {
   recordId: string;
   pageTitle: string;
   pageUrl: string;
-  projectId?: string;
+  domainId?: string;
   savedAt: string;
 }
 

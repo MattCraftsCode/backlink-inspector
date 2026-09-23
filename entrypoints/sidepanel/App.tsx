@@ -3,7 +3,6 @@ import {
   BookmarkPlus,
   CheckCircle2,
   Copy,
-  Download,
   Eraser,
   ExternalLink,
   FileJson,
@@ -14,8 +13,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DomainManagerDialog from '../../components/DomainManagerDialog';
+import DomainSelect from '../../components/DomainSelect';
+import { parseDomainLines } from '../../core/domain-list';
 import { normalizeTarget } from '../../core/domain-matcher';
-import { getOptionalOriginPattern } from '../../core/page-access';
 import type {
   BackgroundRequest,
   BackgroundResponse,
@@ -24,17 +25,17 @@ import type {
 import { isDynamicScanMessage } from '../../shared/messages';
 import type {
   PageMetadata,
-  Project,
   ResultFilter,
   SavedRecord,
   ScanPayload,
   ScanResult,
+  TargetDomain,
 } from '../../shared/types';
 import {
   clearSavedRecords,
-  getProjects,
+  getDomains,
   getSavedRecords,
-  saveProject,
+  replaceDomains,
   toggleSavedRecord,
 } from '../../storage/repository';
 
@@ -146,11 +147,13 @@ const downloadFile = (content: string, filename: string, type: string) => {
 };
 
 export default function App() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [domains, setDomains] = useState<TargetDomain[]>([]);
+  const [selectedDomainId, setSelectedDomainId] = useState('');
   const [domain, setDomain] = useState('resizecraft.com');
   const [includeSubdomains, setIncludeSubdomains] = useState(true);
-  const [exactUrl, setExactUrl] = useState(false);
+  const [domainManagerOpen, setDomainManagerOpen] = useState(false);
+  const [domainDraft, setDomainDraft] = useState('');
+  const [domainManagerError, setDomainManagerError] = useState('');
   const [activeTab, setActiveTab] = useState<chrome.tabs.Tab | null>(null);
   const [metadata, setMetadata] = useState<PageMetadata>(EMPTY_METADATA);
   const [results, setResults] = useState<ScanResult[]>([]);
@@ -172,15 +175,15 @@ export default function App() {
 
   useEffect(() => {
     void Promise.all([
-      getProjects(),
+      getDomains(),
       getSavedRecords(),
       chrome.runtime.sendMessage<BackgroundRequest, BackgroundResponse>({ type: 'GET_ACTIVE_TAB' }),
-    ]).then(([storedProjects, records, tabResponse]) => {
-      setProjects(storedProjects);
+    ]).then(([storedDomains, records, tabResponse]) => {
+      setDomains(storedDomains);
       setSavedRecords(records);
-      const first = storedProjects[0];
+      const first = storedDomains[0];
       if (first) {
-        setSelectedProjectId(first.id);
+        setSelectedDomainId(first.id);
         setDomain(first.domain);
       }
       if (tabResponse.ok && tabResponse.tab) {
@@ -213,19 +216,6 @@ export default function App() {
       type: 'ENSURE_CONTENT_SCRIPT',
       tabId: tab.id,
     });
-    if (!response.ok && response.code === 'PERMISSION_REQUIRED') {
-      const originPattern = getOptionalOriginPattern(tab.url);
-      if (!originPattern) throw new Error(response.message);
-      const granted = await chrome.permissions.request({ origins: [originPattern] });
-      if (granted) {
-        response = await chrome.runtime.sendMessage<BackgroundRequest, BackgroundResponse>({
-          type: 'ENSURE_CONTENT_SCRIPT',
-          tabId: tab.id,
-        });
-      } else {
-        throw new Error('Page access was not granted. Allow access for this site, then scan again.');
-      }
-    }
     if (!response.ok) throw new Error(response.message);
   }, []);
 
@@ -252,7 +242,7 @@ export default function App() {
     try {
       const response = await sendToContent({
         type: 'SCAN_PAGE',
-        options: { target: domain, includeSubdomains, exactUrl },
+        options: { target: domain, includeSubdomains, exactUrl: false },
       });
       if (!response.ok || !response.payload) throw new Error(response.error ?? 'The page scan failed.');
       setResults(response.payload.results);
@@ -298,7 +288,7 @@ export default function App() {
       recordId: crypto.randomUUID(),
       pageTitle: metadata.title,
       pageUrl: metadata.url,
-      projectId: selectedProjectId || undefined,
+      domainId: selectedDomainId || undefined,
       savedAt: new Date().toISOString(),
     };
     const state = await toggleSavedRecord(record);
@@ -306,21 +296,37 @@ export default function App() {
     showToast(state.saved ? 'Saved to backlink records' : 'Removed from saved records');
   };
 
-  const handleSaveProject = async () => {
-    const normalized = normalizeTarget(domain);
-    if (!normalized) {
-      setError('Enter a valid domain before saving the project.');
+  const openDomainManager = useCallback(() => {
+    setDomainDraft(domains.map((item) => item.domain).join('\n'));
+    setDomainManagerError('');
+    setDomainManagerOpen(true);
+  }, [domains]);
+
+  const closeDomainManager = useCallback(() => {
+    setDomainManagerOpen(false);
+    setDomainManagerError('');
+  }, []);
+
+  const handleSaveDomains = useCallback(async () => {
+    const parsed = parseDomainLines(domainDraft);
+    if (parsed.invalid.length) {
+      setDomainManagerError(`Invalid entries: ${parsed.invalid.slice(0, 3).join(', ')}`);
       return;
     }
-    const suggested = normalized.hostname.split('.')[0] || normalized.hostname;
-    const name = window.prompt('Project name', suggested.charAt(0).toUpperCase() + suggested.slice(1));
-    if (!name?.trim()) return;
-    const state = await saveProject({ name: name.trim(), domain: domain.trim() });
-    setProjects(state.projects);
-    setSelectedProjectId(state.project.id);
-    setMenuOpen(false);
-    showToast('Project saved locally');
-  };
+    if (!parsed.domains.length) {
+      setDomainManagerError('Add at least one valid domain.');
+      return;
+    }
+
+    const updated = await replaceDomains(parsed.domains);
+    const selected = updated.find((item) => item.id === selectedDomainId) ?? updated[0];
+    setDomains(updated);
+    setSelectedDomainId(selected?.id ?? '');
+    setDomain(selected?.domain ?? '');
+    setDomainManagerOpen(false);
+    setDomainManagerError('');
+    showToast(`${updated.length} domains saved locally`);
+  }, [domainDraft, selectedDomainId, showToast]);
 
   const handleExport = (format: 'json' | 'csv') => {
     const stamp = new Date().toISOString().slice(0, 10);
@@ -389,7 +395,6 @@ export default function App() {
           </button>
           {menuOpen && (
             <div className="panel-menu">
-              <button type="button" onClick={handleSaveProject}><BookmarkPlus size={15} /> Save current project</button>
               <button type="button" onClick={() => handleExport('json')} disabled={!results.length}><FileJson size={15} /> Export JSON</button>
               <button type="button" onClick={() => handleExport('csv')} disabled={!results.length}><FileSpreadsheet size={15} /> Export CSV</button>
               <div className="menu-divider" />
@@ -400,39 +405,25 @@ export default function App() {
       </header>
 
       <section className="panel-body">
-        <div className="field-grid">
-          <label className="field">
-            <span>SaaS project</span>
-            <select
-              value={selectedProjectId}
-              onChange={(event) => {
-                const project = projects.find((item) => item.id === event.target.value);
-                setSelectedProjectId(event.target.value);
-                if (project) setDomain(project.domain);
-              }}
-            >
-              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-              <option value="">Custom target</option>
-            </select>
-          </label>
-          <label className="field field-domain">
+        <div className="domain-field">
+          <div className="domain-field-label">
             <span>Target domain</span>
-            <input
-              value={domain}
-              onChange={(event) => {
-                setDomain(event.target.value);
-                const project = projects.find((item) => item.domain === event.target.value);
-                setSelectedProjectId(project?.id ?? '');
-              }}
-              spellCheck={false}
-              placeholder="example.com"
-            />
-          </label>
+            <span>{domains.length} saved</span>
+          </div>
+          <DomainSelect
+            domains={domains}
+            selectedId={selectedDomainId}
+            onSelect={(item) => {
+              setSelectedDomainId(item.id);
+              setDomain(item.domain);
+              setError('');
+            }}
+            onManage={openDomainManager}
+          />
         </div>
 
         <div className="options">
           <label className="check"><input type="checkbox" checked={includeSubdomains} onChange={(event) => setIncludeSubdomains(event.target.checked)} /> Include subdomains</label>
-          <label className="check"><input type="checkbox" checked={exactUrl} onChange={(event) => setExactUrl(event.target.checked)} /> Match exact URL</label>
         </div>
 
         <div className="actions">
@@ -527,6 +518,18 @@ export default function App() {
           <span>{savedRecords.length} saved · Local mode</span>
         </footer>
       </section>
+
+      <DomainManagerDialog
+        open={domainManagerOpen}
+        value={domainDraft}
+        error={domainManagerError}
+        onChange={(value) => {
+          setDomainDraft(value);
+          setDomainManagerError('');
+        }}
+        onClose={closeDomainManager}
+        onSave={handleSaveDomains}
+      />
 
       <div className={`toast ${toast ? 'is-visible' : ''}`} role="status" aria-live="polite">
         <CheckCircle2 size={15} /><span>{toast}</span>

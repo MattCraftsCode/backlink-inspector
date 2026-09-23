@@ -1,3 +1,4 @@
+import { getBadgePosition } from '../core/badge-position';
 import { findRedirectTarget, normalizeTarget, urlMatchesTarget } from '../core/domain-matcher';
 import type { ContentRequest, DynamicScanMessage } from '../shared/messages';
 import type { Placement, RelFlags, ScanOptions, ScanPayload, ScanResult } from '../shared/types';
@@ -18,7 +19,8 @@ const HIGHLIGHT_ROOT_ID = '__backlink-inspector-overlay';
 const MUTATION_DELAY = 450;
 
 export default defineContentScript({
-  registration: 'runtime',
+  matches: ['http://*/*', 'https://*/*'],
+  runAt: 'document_idle',
   main() {
     if (window.__backlinkInspectorInstalled) return;
     window.__backlinkInspectorInstalled = true;
@@ -30,6 +32,8 @@ export default defineContentScript({
     let renderFrame: number | undefined;
     let scanSequence = 0;
     let highlightsEnabled = true;
+    let animatedResultId: string | null = null;
+    let animationTimer: number | undefined;
 
     const normalizeSpace = (value: string) => value.replace(/\s+/g, ' ').trim();
     const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -241,6 +245,8 @@ export default defineContentScript({
     const clearHighlights = () => {
       highlightsEnabled = false;
       if (renderFrame) cancelAnimationFrame(renderFrame);
+      window.clearTimeout(animationTimer);
+      animatedResultId = null;
       document.getElementById(HIGHLIGHT_ROOT_ID)?.remove();
       selectedId = null;
     };
@@ -256,8 +262,11 @@ export default defineContentScript({
           const color = colorFor(result);
           const rects = rectsFor(target);
           rects.forEach((rect, rectIndex) => {
+            const selected = selectedId === result.id;
+            const animated = selected && animatedResultId === result.id;
             const highlight = document.createElement('div');
             highlight.setAttribute(ROOT_ATTRIBUTE, 'true');
+            highlight.style.setProperty('--bi-highlight-color', color);
             Object.assign(highlight.style, {
               position: 'absolute',
               left: `${rect.left + scrollX - 3}px`,
@@ -266,17 +275,21 @@ export default defineContentScript({
               height: `${rect.height + 6}px`,
               border: `2px solid ${color}`,
               borderRadius: '5px',
-              background: result.type === 'text' ? 'rgba(242, 183, 5, .22)' : 'transparent',
-              boxShadow: selectedId === result.id ? `0 0 0 7px ${color}33` : `0 0 0 3px ${color}1f`,
-              animation: selectedId === result.id ? '__biPulse 1.05s ease 2' : 'none',
+              background: result.type === 'text'
+                ? 'rgba(242, 183, 5, .22)'
+                : selected ? `color-mix(in srgb, ${color} 8%, transparent)` : 'transparent',
+              boxShadow: selected
+                ? `0 0 0 4px ${color}30, 0 6px 22px ${color}24`
+                : `0 0 0 3px ${color}1f`,
+              animation: animated ? '__biFocusPulse 1.25s cubic-bezier(.2,.8,.2,1) 2' : 'none',
+              transformOrigin: 'center',
             });
-            if (selectedId === result.id && rectIndex === 0) {
+            if (selected && rectIndex === 0) {
+              const badgePosition = getBadgePosition(rect, innerWidth, innerHeight);
               const badge = document.createElement('span');
               badge.textContent = String([...locatedResults.keys()].indexOf(result.id) + 1);
               Object.assign(badge.style, {
                 position: 'absolute',
-                left: '-13px',
-                top: '-28px',
                 display: 'grid',
                 placeItems: 'center',
                 width: '24px',
@@ -287,6 +300,9 @@ export default defineContentScript({
                 color: 'white',
                 boxShadow: '0 4px 12px rgba(0,0,0,.25)',
                 font: '600 11px system-ui, sans-serif',
+                animation: animated ? '__biBadgePop .42s cubic-bezier(.2,.9,.25,1.25) both' : 'none',
+                left: `${badgePosition.left}px`,
+                top: `${badgePosition.top}px`,
               });
               highlight.append(badge);
             }
@@ -298,7 +314,18 @@ export default defineContentScript({
           const style = document.createElement('style');
           style.id = '__biInspectorStyle';
           style.setAttribute(ROOT_ATTRIBUTE, 'true');
-          style.textContent = '@keyframes __biPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}';
+          style.textContent = `
+            @keyframes __biFocusPulse {
+              0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--bi-highlight-color) 42%, transparent); transform: scale(.985); }
+              48% { box-shadow: 0 0 0 11px color-mix(in srgb, var(--bi-highlight-color) 18%, transparent), 0 8px 28px color-mix(in srgb, var(--bi-highlight-color) 24%, transparent); transform: scale(1.018); }
+              100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--bi-highlight-color) 20%, transparent), 0 6px 22px color-mix(in srgb, var(--bi-highlight-color) 14%, transparent); transform: scale(1); }
+            }
+            @keyframes __biBadgePop {
+              0% { opacity: 0; transform: scale(.55); }
+              70% { opacity: 1; transform: scale(1.12); }
+              100% { opacity: 1; transform: scale(1); }
+            }
+          `;
           document.documentElement.append(style);
         }
       });
@@ -314,6 +341,7 @@ export default defineContentScript({
       const text = scanText(target.hostname, options.includeSubdomains, links.length);
       locatedResults = new Map([...links, ...text].map((item) => [item.result.id, item]));
       selectedId = locatedResults.keys().next().value ?? null;
+      animatedResultId = dynamic ? null : selectedId;
       renderHighlights();
       return {
         results: [...locatedResults.values()].map((item) => item.result),
@@ -328,9 +356,15 @@ export default defineContentScript({
       if (!located) return false;
       highlightsEnabled = true;
       selectedId = resultId;
+      animatedResultId = resultId;
+      window.clearTimeout(animationTimer);
+      animationTimer = window.setTimeout(() => {
+        if (animatedResultId === resultId) animatedResultId = null;
+      }, 2800);
       const element = located.target instanceof Range ? located.target.startContainer.parentElement : located.target;
       element?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-      window.setTimeout(renderHighlights, 360);
+      renderHighlights();
+      window.setTimeout(renderHighlights, 420);
       return true;
     };
 
