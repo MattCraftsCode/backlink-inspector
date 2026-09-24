@@ -47,14 +47,21 @@ export default function DomainSelect({ domains, selectedId, onSelect, onManage }
     <div className="flex items-stretch gap-2" ref={rootRef}>
       <div className="relative min-w-0 flex-1">
         <button
-          className="flex h-10 w-full items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 text-left text-xs font-medium text-[var(--text)] shadow-[0_1px_2px_rgba(20,30,55,.04)] transition hover:border-[color-mix(in_srgb,var(--brand)_45%,var(--line))] focus-visible:border-[var(--brand)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[color-mix(in_srgb,var(--brand)_18%,transparent)]"
+          className="flex h-10 w-full items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 text-left text-xs font-medium text-[var(--text)] shadow-[0_1px_2px_rgba(22,88,123,.06)] transition hover:border-[color-mix(in_srgb,var(--brand)_45%,var(--line))] focus-visible:border-[var(--brand)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[color-mix(in_srgb,var(--brand)_18%,transparent)]"
           type="button"
           role="combobox"
           aria-controls="domain-listbox"
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-activedescendant={open ? `domain-option-${domains[activeIndex]?.id}` : undefined}
-          onClick={() => open ? setOpen(false) : openList()}
+          onClick={() => {
+            if (!domains.length) {
+              onManage();
+              return;
+            }
+            if (open) setOpen(false);
+            else openList();
+          }}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
               event.preventDefault();
@@ -81,13 +88,13 @@ export default function DomainSelect({ domains, selectedId, onSelect, onManage }
           }}
         >
           <Globe2 className="shrink-0 text-[var(--brand)]" size={15} />
-          <span className="min-w-0 flex-1 truncate">{selected?.domain ?? 'No domains configured'}</span>
+          <span className="min-w-0 flex-1 truncate">{selected?.domain ?? 'Add a target domain'}</span>
           <ChevronDown className={`shrink-0 text-[var(--muted)] transition-transform ${open ? 'rotate-180' : ''}`} size={15} />
         </button>
 
         {open && (
           <div
-            className="absolute z-30 mt-2 max-h-56 w-full overflow-auto rounded-lg border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[0_16px_38px_rgba(20,30,55,.18)]"
+            className="absolute z-30 mt-2 max-h-56 w-full overflow-auto rounded-lg border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[0_16px_38px_rgba(22,88,123,.18)]"
             id="domain-listbox"
             role="listbox"
           >

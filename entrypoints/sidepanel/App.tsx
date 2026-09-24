@@ -149,7 +149,7 @@ const downloadFile = (content: string, filename: string, type: string) => {
 export default function App() {
   const [domains, setDomains] = useState<TargetDomain[]>([]);
   const [selectedDomainId, setSelectedDomainId] = useState('');
-  const [domain, setDomain] = useState('resizecraft.com');
+  const [domain, setDomain] = useState('');
   const [includeSubdomains, setIncludeSubdomains] = useState(true);
   const [domainManagerOpen, setDomainManagerOpen] = useState(false);
   const [domainDraft, setDomainDraft] = useState('');
@@ -254,6 +254,10 @@ export default function App() {
   }, [ensureScanner, getCurrentTab]);
 
   const handleScan = async () => {
+    if (!domain.trim()) {
+      setError('Please add a target domain first.');
+      return;
+    }
     if (!normalizeTarget(domain)) {
       setError('Enter a valid domain or full URL.');
       return;

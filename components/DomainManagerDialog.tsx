@@ -34,10 +34,10 @@ export default function DomainManagerDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(15,23,42,.38)] p-4 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => {
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(22,88,123,.38)] p-4 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <section className="w-full max-w-[360px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)] shadow-[0_24px_70px_rgba(15,23,42,.28)]" role="dialog" aria-modal="true" aria-labelledby="domain-manager-title">
+      <section className="w-full max-w-[360px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)] shadow-[0_24px_70px_rgba(22,88,123,.28)]" role="dialog" aria-modal="true" aria-labelledby="domain-manager-title">
         <header className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3.5">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]"><Globe2 size={16} /></span>

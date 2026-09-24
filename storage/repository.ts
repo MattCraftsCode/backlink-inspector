@@ -4,33 +4,33 @@ const DOMAINS_KEY = 'backlinkInspector.domains';
 const LEGACY_PROJECTS_KEY = 'backlinkInspector.projects';
 const RECORDS_KEY = 'backlinkInspector.records';
 
-const DEFAULT_DOMAINS: TargetDomain[] = [
-  {
-    id: 'resizecraft',
-    domain: 'resizecraft.com',
-    createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
-  },
-  {
-    id: 'fullmira',
-    domain: 'fullmira.com',
-    createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
-  },
-  {
-    id: 'gamebodycam-wiki',
-    domain: 'gamebodycam.wiki',
-    createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
-  },
-];
+const LEGACY_SEED_DATE = '2026-01-01T00:00:00.000Z';
+const LEGACY_SEEDED_DOMAINS = new Set([
+  'resizecraft:resizecraft.com',
+  'fullmira:fullmira.com',
+  'gamebodycam-wiki:gamebodycam.wiki',
+]);
+
+const removeLegacySeededDomains = (domains: TargetDomain[]) => domains.filter((item) => (
+  item.createdAt !== LEGACY_SEED_DATE
+  || !LEGACY_SEEDED_DOMAINS.has(`${item.id}:${item.domain.toLowerCase()}`)
+));
 
 export const getDomains = async () => {
   const stored = await chrome.storage.local.get([DOMAINS_KEY, LEGACY_PROJECTS_KEY]);
   const domains = stored[DOMAINS_KEY] as TargetDomain[] | undefined;
-  if (domains?.length) return domains;
+  if (domains) {
+    const cleaned = removeLegacySeededDomains(domains);
+    if (cleaned.length !== domains.length) {
+      await chrome.storage.local.set({ [DOMAINS_KEY]: cleaned });
+    }
+    return cleaned;
+  }
 
   const legacyProjects = stored[LEGACY_PROJECTS_KEY] as Array<{ id: string; domain: string; createdAt: string }> | undefined;
-  const migrated = legacyProjects?.length
-    ? legacyProjects.map(({ id, domain, createdAt }) => ({ id, domain, createdAt }))
-    : DEFAULT_DOMAINS;
+  const migrated = removeLegacySeededDomains(
+    legacyProjects?.map(({ id, domain, createdAt }) => ({ id, domain, createdAt })) ?? [],
+  );
   await chrome.storage.local.set({ [DOMAINS_KEY]: migrated });
   return migrated;
 };
