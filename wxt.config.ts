@@ -14,6 +14,10 @@ export default defineConfig({
     host_permissions: ['http://*/*', 'https://*/*'],
     action: {
       default_title: 'Inspect backlinks',
+      default_icon: {
+        16: 'icon-16.png',
+        32: 'icon-32.png',
+      },
     },
   },
 });

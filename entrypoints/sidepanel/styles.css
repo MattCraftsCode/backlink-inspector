@@ -37,7 +37,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .panel-shell { position: relative; min-height: 100vh; overflow: hidden; background: var(--surface); }
 .panel-head { display: flex; align-items: center; justify-content: space-between; min-height: 62px; padding: 0 18px; border-bottom: 1px solid var(--line); }
 .product { display: flex; min-width: 0; align-items: center; gap: 10px; }
-.product-icon { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 8px; background: var(--brand); color: #fff; box-shadow: 0 7px 18px color-mix(in srgb, var(--brand) 34%, transparent); }
+.product-icon { display: block; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 8px; box-shadow: 0 7px 18px rgba(20, 108, 153, .24); }
 .product-copy { min-width: 0; }
 .product-name { font-size: 14px; font-weight: 600; }
 .product-state { display: flex; min-width: 0; max-width: 240px; align-items: center; gap: 5px; margin-top: 2px; color: var(--muted); font-size: 11px; }

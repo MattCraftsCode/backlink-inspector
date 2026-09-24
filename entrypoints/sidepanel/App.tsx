@@ -412,7 +412,7 @@ export default function App() {
     <main className="panel-shell">
       <header className="panel-head">
         <div className="product">
-          <span className="product-icon"><ScanSearch size={17} /></span>
+          <img className="product-icon" src="/icon-48.png" alt="" />
           <div className="product-copy">
             <div className="product-name">Backlink Inspector</div>
             <div className="product-state" title={metadata.title || activeTab?.title}>
