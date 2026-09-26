@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getDomains } from './repository';
+import {
+  getDomains,
+  getStoredSelectedDomainId,
+  setStoredSelectedDomainId,
+} from './repository';
 
 const DOMAINS_KEY = 'backlinkInspector.domains';
 const LEGACY_PROJECTS_KEY = 'backlinkInspector.projects';
-const LEGACY_SEED_DATE = '2026-01-01T00:00:00.000Z';
+const SELECTED_DOMAIN_KEY = 'backlinkInspector.selectedDomainId';
 
 describe('domain storage', () => {
   const get = vi.fn();
@@ -38,7 +42,7 @@ describe('domain storage', () => {
         {
           id: 'resizecraft',
           domain: 'resizecraft.com',
-          createdAt: LEGACY_SEED_DATE,
+          createdAt: '2025-06-01T00:00:00.000Z',
         },
         customDomain,
       ],
@@ -46,5 +50,15 @@ describe('domain storage', () => {
 
     await expect(getDomains()).resolves.toEqual([customDomain]);
     expect(set).toHaveBeenCalledWith({ [DOMAINS_KEY]: [customDomain] });
+  });
+
+  it('reads and writes the selected domain id', async () => {
+    get.mockResolvedValue({ [SELECTED_DOMAIN_KEY]: 'custom-domain' });
+
+    await expect(getStoredSelectedDomainId()).resolves.toBe('custom-domain');
+    await setStoredSelectedDomainId('next-domain');
+
+    expect(get).toHaveBeenCalledWith(SELECTED_DOMAIN_KEY);
+    expect(set).toHaveBeenCalledWith({ [SELECTED_DOMAIN_KEY]: 'next-domain' });
   });
 });

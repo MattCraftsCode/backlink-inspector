@@ -35,7 +35,9 @@ import {
   clearSavedRecords,
   getDomains,
   getSavedRecords,
+  getStoredSelectedDomainId,
   replaceDomains,
+  setStoredSelectedDomainId,
   toggleSavedRecord,
 } from '../../storage/repository';
 
@@ -178,15 +180,15 @@ export default function App() {
     void Promise.all([
       getDomains(),
       getSavedRecords(),
+      getStoredSelectedDomainId(),
       chrome.runtime.sendMessage<BackgroundRequest, BackgroundResponse>({ type: 'GET_ACTIVE_TAB' }),
-    ]).then(([storedDomains, records, tabResponse]) => {
+    ]).then(([storedDomains, records, storedSelectedDomainId, tabResponse]) => {
       setDomains(storedDomains);
       setSavedRecords(records);
-      const first = storedDomains[0];
-      if (first) {
-        setSelectedDomainId(first.id);
-        setDomain(first.domain);
-      }
+      const selected = storedDomains.find((item) => item.id === storedSelectedDomainId) ?? storedDomains[0];
+      setSelectedDomainId(selected?.id ?? '');
+      setDomain(selected?.domain ?? '');
+      void setStoredSelectedDomainId(selected?.id ?? '');
       if (tabResponse.ok && tabResponse.tab) {
         setActiveTab(tabResponse.tab);
         setMetadata((current) => ({
@@ -358,11 +360,28 @@ export default function App() {
     setDomains(updated);
     setSelectedDomainId(selected?.id ?? '');
     setDomain(selected?.domain ?? '');
+    await setStoredSelectedDomainId(selected?.id ?? '');
     setDomainManagerOpen(false);
     setDomainDraft('');
     setDomainManagerError('');
     showToast(`${additions.length} ${additions.length === 1 ? 'domain' : 'domains'} added`);
   }, [domainDraft, domains, selectedDomainId, showToast]);
+
+  const handleDeleteDomain = useCallback(async (domainId: string) => {
+    const deleted = domains.find((item) => item.id === domainId);
+    if (!deleted) return;
+
+    const updated = await replaceDomains(
+      domains.filter((item) => item.id !== domainId).map((item) => item.domain),
+    );
+    const selected = updated.find((item) => item.id === selectedDomainId) ?? updated[0];
+    setDomains(updated);
+    setSelectedDomainId(selected?.id ?? '');
+    setDomain(selected?.domain ?? '');
+    await setStoredSelectedDomainId(selected?.id ?? '');
+    setError('');
+    showToast(`${deleted.domain} removed`);
+  }, [domains, selectedDomainId, showToast]);
 
   const handleExport = (format: 'json' | 'csv') => {
     const stamp = new Date().toISOString().slice(0, 10);
@@ -453,6 +472,7 @@ export default function App() {
               setSelectedDomainId(item.id);
               setDomain(item.domain);
               setError('');
+              void setStoredSelectedDomainId(item.id);
             }}
             onManage={openDomainManager}
           />
@@ -557,6 +577,8 @@ export default function App() {
 
       <DomainManagerDialog
         open={domainManagerOpen}
+        domains={domains}
+        selectedDomainId={selectedDomainId}
         value={domainDraft}
         error={domainManagerError}
         onChange={(value) => {
@@ -564,6 +586,7 @@ export default function App() {
           setDomainManagerError('');
         }}
         onClose={closeDomainManager}
+        onDelete={handleDeleteDomain}
         onSave={handleSaveDomains}
       />
 

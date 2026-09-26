@@ -3,18 +3,13 @@ import type { SavedRecord, TargetDomain } from '../shared/types';
 const DOMAINS_KEY = 'backlinkInspector.domains';
 const LEGACY_PROJECTS_KEY = 'backlinkInspector.projects';
 const RECORDS_KEY = 'backlinkInspector.records';
+const SELECTED_DOMAIN_KEY = 'backlinkInspector.selectedDomainId';
 
-const LEGACY_SEED_DATE = '2026-01-01T00:00:00.000Z';
-const LEGACY_SEEDED_DOMAINS = new Set([
-  'resizecraft:resizecraft.com',
-  'fullmira:fullmira.com',
-  'gamebodycam-wiki:gamebodycam.wiki',
-]);
+const LEGACY_SEEDED_DOMAIN_IDS = new Set(['resizecraft', 'fullmira', 'gamebodycam-wiki']);
 
-const removeLegacySeededDomains = (domains: TargetDomain[]) => domains.filter((item) => (
-  item.createdAt !== LEGACY_SEED_DATE
-  || !LEGACY_SEEDED_DOMAINS.has(`${item.id}:${item.domain.toLowerCase()}`)
-));
+const removeLegacySeededDomains = (domains: TargetDomain[]) => (
+  domains.filter((item) => !LEGACY_SEEDED_DOMAIN_IDS.has(item.id))
+);
 
 export const getDomains = async () => {
   const stored = await chrome.storage.local.get([DOMAINS_KEY, LEGACY_PROJECTS_KEY]);
@@ -49,6 +44,15 @@ export const replaceDomains = async (values: string[]) => {
   await chrome.storage.local.set({ [DOMAINS_KEY]: updated });
   return updated;
 };
+
+export const getStoredSelectedDomainId = async () => {
+  const stored = await chrome.storage.local.get(SELECTED_DOMAIN_KEY);
+  return (stored[SELECTED_DOMAIN_KEY] as string | undefined) ?? '';
+};
+
+export const setStoredSelectedDomainId = (domainId: string) => (
+  chrome.storage.local.set({ [SELECTED_DOMAIN_KEY]: domainId })
+);
 
 export const getSavedRecords = async () => {
   const stored = await chrome.storage.local.get(RECORDS_KEY);

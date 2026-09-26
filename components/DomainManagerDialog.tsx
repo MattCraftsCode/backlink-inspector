@@ -1,21 +1,28 @@
-import { Globe2, X } from 'lucide-react';
+import { Globe2, Trash2, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import type { TargetDomain } from '../shared/types';
 
 interface DomainManagerDialogProps {
   open: boolean;
+  domains: TargetDomain[];
+  selectedDomainId: string;
   value: string;
   error: string;
   onChange: (value: string) => void;
   onClose: () => void;
+  onDelete: (domainId: string) => void;
   onSave: () => void;
 }
 
 export default function DomainManagerDialog({
   open,
+  domains,
+  selectedDomainId,
   value,
   error,
   onChange,
   onClose,
+  onDelete,
   onSave,
 }: DomainManagerDialogProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -52,7 +59,7 @@ export default function DomainManagerDialog({
         <div className="p-4">
           <textarea
             ref={textareaRef}
-            className="min-h-48 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 font-mono text-xs leading-5 text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)] focus:ring-3 focus:ring-[color-mix(in_srgb,var(--brand)_18%,transparent)]"
+            className="min-h-36 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 font-mono text-xs leading-5 text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)] focus:ring-3 focus:ring-[color-mix(in_srgb,var(--brand)_18%,transparent)]"
             value={value}
             spellCheck={false}
             placeholder={'example.com\nabc.com'}
@@ -60,6 +67,33 @@ export default function DomainManagerDialog({
           />
           {error && <p className="mt-2 rounded-md bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-2.5 py-2 text-[11px] leading-4 text-[var(--danger)]" role="alert">{error}</p>}
           <p className="mt-2 text-[10px] leading-4 text-[var(--muted)]">Full URLs are accepted and stored as domains. Duplicate entries are removed automatically.</p>
+
+          {domains.length > 0 && (
+            <div className="mt-4 border-t border-[var(--line)] pt-3">
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase text-[var(--muted)]">
+                <span>Saved domains</span>
+                <span>{domains.length}</span>
+              </div>
+              <div className="mt-2 grid max-h-36 gap-1.5 overflow-auto pr-1">
+                {domains.map((item) => (
+                  <div className="flex min-h-9 items-center gap-2 rounded-md bg-[var(--surface-2)] px-2.5" key={item.id}>
+                    <Globe2 className="shrink-0 text-[var(--brand)]" size={14} />
+                    <span className="min-w-0 flex-1 truncate text-xs text-[var(--text)]">{item.domain}</span>
+                    {item.id === selectedDomainId && <span className="text-[9px] font-semibold uppercase text-[var(--brand)]">Selected</span>}
+                    <button
+                      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] hover:text-[var(--danger)]"
+                      type="button"
+                      aria-label={`Delete ${item.domain}`}
+                      title={`Delete ${item.domain}`}
+                      onClick={() => onDelete(item.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <footer className="flex justify-end gap-2 border-t border-[var(--line)] px-4 py-3">
